@@ -1,35 +1,40 @@
 // events/voiceStateUpdate.mjs
+import { ChannelType } from 'discord.js';
+import { startQueue1Game } from '../games/queue1Game.mjs';
+import { CONFIG } from '../config.mjs'; // ✨ configをインポート
 
-// ==========================================
-// イベントの設定と処理
-// ==========================================
-export const name = 'voiceStateUpdate'; // 反応するDiscordのイベント名
-export const once = false;             // 何回も繰り返し実行するので false
+export const name = 'voiceStateUpdate';
+export const once = false;
 
-// イベントが発生したときに実行される処理
-// 引数の (oldState, newState) には、移動前と移動後の通話状態が入っています
 export async function execute(oldState, newState) {
-    // メンバーがボイスチャンネルに「入った」または「移動した」ときだけチェック
-    //（チャンネルが null でない ＝ どこかのチャンネルにいる状態）
-    if (newState.channelId !== null && oldState.channelId !== newState.channelId) {
-        
-        // ユーザーが入ったボイスチャンネルを取得
-        const channel = newState.channel;
-        
-        // そのチャンネルに今何人いるか数える (.size)
-        const memberCount = channel.members.size;
-        
-        console.log(`🔊 ${channel.name} の現在の人数: ${memberCount}人`);
+    try {
+        // ✨ configから設定値を自動取得
+        const queue1Id = CONFIG.CHANNELS.QUEUE1_VC_ID;
+        const requiredPlayers = CONFIG.REQUIRED_PLAYERS;
 
-        // ぴったり8人になった瞬間を検知
-        if (memberCount === 8) {
-            console.log(`🎉 ${channel.name} が8人になりました！イベントを発生させます！`);
+        // 誰かが新しく設定された Queue1 チャンネルに入った、またはチャンネルを移動してきた場合
+        if (newState.channelId === queue1Id && oldState.channelId !== newState.channelId) {
             
-            // 例：そのボイスチャンネルがあるサーバーの、最初のテキストチャンネルにメッセージを送る
-            const textChannel = channel.guild.systemChannel || channel.guild.channels.cache.find(c => c.isTextBased());
-            if (textChannel) {
-                await textChannel.send(`📢 **${channel.name}** が8人になりました！ゲームを始めましょう！ 🎮`);
+            const queueChannel = newState.channel;
+            if (!queueChannel || queueChannel.type !== ChannelType.GuildVoice) return;
+
+            // 現在入っている人数を数える
+            const memberCount = queueChannel.members.size;
+            console.log(`🔊 Queue1 にプレイヤーが参加しました (${memberCount}/${requiredPlayers})`);
+
+            // 設定人数以上集まったかを検知
+            if (memberCount >= requiredPlayers) {
+                console.log(`🎉 必要人数（${requiredPlayers}人以上）が集まりました！選考を開始します。`);
+
+                const currentMembers = Array.from(queueChannel.members.keys());
+                // 先頭から必要人数だけを正確に選別
+                const selectedPlayerIds = currentMembers.slice(0, requiredPlayers);
+
+                // 司令塔関数を呼び出してゲームを開始する
+                await startQueue1Game(newState.client, selectedPlayerIds, newState.guild);
             }
         }
+    } catch (error) {
+        console.error('❌ voiceStateUpdate イベント内でエラーが発生しました:', error);
     }
 }
