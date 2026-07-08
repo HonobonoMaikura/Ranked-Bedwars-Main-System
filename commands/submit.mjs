@@ -16,25 +16,25 @@ export async function execute(interaction) {
         const textChannelId = interaction.channelId;
 
         if (!activeGames.has(textChannelId)) {
-            return await interaction.reply({ content: '❌ ここは進行中のゲームチャンネルではありません。', ephemeral: true });
+            return await interaction.reply({ content: '❌ ここは進行中のゲームチャンネルではありません。', flags: [MessageFlags.Ephemeral] });
         }
 
         const gameData = activeGames.get(textChannelId);
 
         if (!gameData.players.includes(interaction.user.id)) {
-            return await interaction.reply({ content: '❌ あなたはこのゲームのプレイヤーではありません。', ephemeral: true });
+            return await interaction.reply({ content: '❌ あなたはこのゲームのプレイヤーではありません。', flags: [MessageFlags.Ephemeral] });
         }
 
         if (gameData.submitStatus !== 'NONE') {
             return await interaction.reply({ 
                 content: `⚠️ すでに <@${gameData.submitUserId}> によって結果提出（またはVoid）の手続きが開始されています。`, 
-                ephemeral: true 
+                flags: [MessageFlags.Ephemeral] 
             });
         }
 
         const screenshot = interaction.options.getAttachment('screenshot');
         if (!screenshot.contentType?.startsWith('image/')) {
-            return await interaction.reply({ content: '❌ スクリーンショット（画像ファイル）を添付してください。', ephemeral: true });
+            return await interaction.reply({ content: '❌ スクリーンショット（画像ファイル）を添付してください。', flags: [MessageFlags.Ephemeral] });
         }
 
         // メモリに情報を一時保存してロック
@@ -100,6 +100,6 @@ export async function execute(interaction) {
 
     } catch (error) {
         console.error('❌ /submit でエラー:', error);
-        await interaction.reply({ content: 'エラーが発生しました。', ephemeral: true });
+        await interaction.reply({ content: 'エラーが発生しました。', flags: [MessageFlags.Ephemeral] });
     }
 }

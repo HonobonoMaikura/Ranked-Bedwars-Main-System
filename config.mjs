@@ -15,6 +15,7 @@ export const CONFIG = {
     CHANNELS: {
         QUEUE1_VC_ID: '1524357859251323051', // ここにQueue1のボイスチャンネルID
         WAITING_ROOM_VC_ID: '1524357804285104168', // ここにWaiting RoomのボイスチャンネルID
+        GAME_RESULTS_CHANNEL_ID: '1524357625427263499', // ここにGamesテキストチャンネルのID
     },
     
     CATEGORIES: {

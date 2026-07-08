@@ -12,14 +12,14 @@ export async function execute(interaction) {
         const textChannelId = interaction.channelId;
 
         if (!activeGames.has(textChannelId)) {
-            return await interaction.reply({ content: '❌ ここは進行中のゲームチャンネルではありません。', ephemeral: true });
+            return await interaction.reply({ content: '❌ ここは進行中のゲームチャンネルではありません。', flags: [MessageFlags.Ephemeral] });
         }
 
         const gameData = activeGames.get(textChannelId);
 
         // 参加者チェック
         if (!gameData.players.includes(interaction.user.id)) {
-            return await interaction.reply({ content: '❌ あなたはこのゲームのプレイヤーではありません。', ephemeral: true });
+            return await interaction.reply({ content: '❌ あなたはこのゲームのプレイヤーではありません。', flags: [MessageFlags.Ephemeral] });
         }
 
         // 二重処理チェック（提出中、またはすでに他の人がVoid投票中の場合）
@@ -27,7 +27,7 @@ export async function execute(interaction) {
             const userName = gameData.submitUserId ? `<@${gameData.submitUserId}>` : '誰か';
             return await interaction.reply({ 
                 content: `⚠️ すでに ${userName} によって手続き（提出またはVoid投票）が開始されています。`, 
-                ephemeral: true 
+                flags: [MessageFlags.Ephemeral] 
             });
         }
 
@@ -95,6 +95,6 @@ export async function execute(interaction) {
 
     } catch (error) {
         console.error('❌ /void でエラー:', error);
-        await interaction.reply({ content: 'エラーが発生しました。', ephemeral: true });
+        await interaction.reply({ content: 'エラーが発生しました。', flags: [MessageFlags.Ephemeral] });
     }
 }
