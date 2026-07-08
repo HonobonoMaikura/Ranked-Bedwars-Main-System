@@ -19,7 +19,7 @@ export const CONFIG = {
     },
     
     CATEGORIES: {
-        TEXT_CATEGORY_ID: '1524357930185396224', // ここにGame TextsのカテゴリーID
+        TEXT_CATEGORY_ID: '1524357753668108412', // ここにGame TextsのカテゴリーID
         VOICE_CATEGORY_ID: '1524357963911794799', // ここにGame CallsのカテゴリーID
         LOG_CATEGORY_ID: '1524357984073945132', // ここにGame LogsのカテゴリーID
     },

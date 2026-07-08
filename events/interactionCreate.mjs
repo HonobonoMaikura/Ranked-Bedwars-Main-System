@@ -65,10 +65,7 @@ export async function execute(interaction) {
             const hasRole = interaction.member.roles.cache.has(scorekeeperRoleId);
 
             if (!hasRole) {
-                return await interaction.reply({
-                    content: '❌ この判定ボタンは監督（スコアラー）のみ押せます。',
-                    flags: [MessageFlags.Ephemeral]
-                });
+                return await interaction.reply({ content: '❌ この判定ボタンは監督（スコアラー）のみ押せます。', flags: [MessageFlags.Ephemeral] });
             }
 
             const gameData = activeGames.get(textChannel.id);
@@ -85,7 +82,7 @@ export async function execute(interaction) {
                 winnerText = "🔴 Team 2";
                 resultColor = "#ff0000";
             } else if (customId.startsWith('director_void_')) {
-                winnerText = "⚪ 無効試合 (Void)";
+                winnerText = "⚪ 無効試合 (Void)"; // 監督によるVoid
                 resultColor = "#aaaaaa";
             }
 
@@ -132,70 +129,77 @@ export async function execute(interaction) {
         }
 
         // --------------------------------------------------
-        // ✨ C. 無効化（Void）投票ボタンの処理 【新規追加！】
+        // C. 無効化（Void）投票ボタンの処理 【修正箇所！】
         // --------------------------------------------------
         if (customId.startsWith('player_void_vote_')) {
             const gameData = activeGames.get(textChannel.id);
             if (!gameData) return await interaction.reply({ content: '❌ ゲームデータがありません。', flags: [MessageFlags.Ephemeral] });
 
-            // 1. ガード：このゲームの参加者（8人）じゃない場合は弾く
             if (!gameData.players.includes(interaction.user.id)) {
-                return await interaction.reply({
-                    content: '❌ あなたはこのゲームのプレイヤーではないため、投票できません。',
-                    flags: [MessageFlags.Ephemeral]
-                });
+                return await interaction.reply({ content: '❌ あなたはこのゲームのプレイヤーではないため、投票できません。', flags: [MessageFlags.Ephemeral] });
             }
 
-            // 2. ガード：すでに投票済みの場合は重複を弾く
             if (gameData.voidVotes.has(interaction.user.id)) {
-                return await interaction.reply({
-                    content: '⚠️ あなたはすでにこの無効化投票に賛成しています。',
-                    flags: [MessageFlags.Ephemeral]
-                });
+                return await interaction.reply({ content: '⚠️ あなたはすでにこの無効化投票に賛成しています。', flags: [MessageFlags.Ephemeral] });
             }
 
-            // 3. 投票を受理（ユーザーIDをSetに追加）
             gameData.voidVotes.add(interaction.user.id);
 
             const requiredVotes = CONFIG.REQUIRED_VOID_VOTES;
             const currentVotes = gameData.voidVotes.size;
 
-            // 4. もし目標票数に達した場合 ➔ 【可決・ゲーム強制終了】
+            // 🛑 目標票数に達した場合 ➔ 【可決・ゲーム強制終了】
             if (currentVotes >= requiredVotes) {
-                // 投票メッセージ（ボタン付き）を削除して終わらせる
-                await interaction.message.delete();
+                await interaction.message.delete().catch(() => {});
 
-                // カテゴリーを「Game Logs」へ移動
+                // 1. ✨【修正】Games（結果）チャンネルにも、画像と同じ綺麗なフォーマットでVoidのログを残す！
+                const team1Mentions = gameData.team1Ids.map(id => `<@${id}>`).join('\n');
+                const team2Mentions = gameData.team2Ids.map(id => `<@${id}>`).join('\n');
+                const now = new Date();
+                const discordTimestamp = `<t:${Math.floor(now.getTime() / 1000)}:t>\n<t:${Math.floor(now.getTime() / 1000)}:d>`;
+
+                const globalResultEmbed = new EmbedBuilder()
+                    .setColor('#aaaaaa') // グレー
+                    .setTitle(`🏆 Game ${gameData.gameIdText} 最終結果`)
+                    .addFields(
+                        { name: 'Team 1', value: team1Mentions, inline: true },
+                        { name: 'Team 2', value: team2Mentions, inline: true },
+                        { name: '\u200B', value: '\u200B', inline: false },
+                        { name: '勝者', value: `**⚪ 無効試合 (Void)**`, inline: false },
+                        { name: '終了時刻', value: discordTimestamp, inline: false }
+                    )
+                    .setTimestamp();
+
+                const resultChannel = await guild.channels.fetch(CONFIG.CHANNELS.GAME_RESULTS_CHANNEL_ID).catch(() => null);
+                if (resultChannel) {
+                    await resultChannel.send({ embeds: [globalResultEmbed] });
+                }
+
+                // 2. 移動とクリーンアップ
                 await moveToLogCategory(textChannel);
-
-                // ボイスチャンネルをクリーンアップ（Waiting Roomへ退避＆削除）
                 await cleanupVoiceChannels(guild, gameData.voiceChannelIds);
 
-                // メモリからゲームデータを削除して完全に終了させる
-                activeGames.delete(textChannel.id);
-
-                // ログチャンネルに最終結果を通知
+                // 3. 移動後の非公開ログチャンネル側にも、一応確定メッセージを残す
                 const voidSuccessEmbed = new EmbedBuilder()
-                    .setColor('#ff0000') // 赤色
+                    .setColor('#ff0000')
                     .setTitle(`⚪ ゲーム ${gameData.gameIdText} 無効試合 (Void)`)
-                    .setDescription(`規定人数（${requiredVotes}人）の賛成が集まったため、このゲームは**無効試合（Void）として処理されました**。\nプレイヤーの通話は切断（退避）され、スコアの変動はありません。`)
+                    .setDescription(`規定人数（${requiredVotes}人）の賛成が集まったため、このゲームは無効試合として処理されました。`)
                     .setTimestamp();
 
                 await textChannel.send({ embeds: [voidSuccessEmbed] });
                 
-                console.log(`⚪ ゲーム ${gameData.gameIdText} がプレイヤー投票により正常にVoid処理されました。`);
+                // 4. メモリから削除
+                activeGames.delete(textChannel.id);
+                
+                console.log(`⚪ ゲーム ${gameData.gameIdText} がプレイヤー投票によりVoid終了し、Gamesチャンネルにログが残りました。`);
                 return;
             }
 
-            // 5. 目標票数に達していない場合 ➔ 【現在の票数をリアルタイム更新】
-            // メッセージ（Embed）の票数表示だけを書き換える
+            // 目標票数に達していない場合は、現在の票数をリアルタイム更新
             const updatedEmbed = EmbedBuilder.from(interaction.message.embeds[0])
                 .setFields({ name: '📊 現在の賛成票', value: `**${currentVotes}** / ${requiredVotes} 票` });
 
-            // update() を使うことで、ピカピカと画面がブレずに票数だけが「カチッ」と上がります
-            await interaction.update({
-                embeds: [updatedEmbed]
-            });
+            await interaction.update({ embeds: [updatedEmbed] });
         }
 
     } catch (error) {
